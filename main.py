@@ -112,7 +112,59 @@ def plot_usage_vs_temperature(
     plt.show()
 
 
+def plot_usage_by_temperature(
+    usage_data: List[Dict[str, str | float]],
+    weather_data: List[Dict[str, str | float]],
+    exclude_start: str | None = "2025-12-22",
+    exclude_end: str | None = "2026-01-19",
+) -> None:
+    """
+    Plot daily electric usage vs mean temperature.
+    X-axis: temperature (°F)
+    Y-axis: electric use (kWh)
+    Optionally exclude a date range (inclusive) using YYYY-MM-DD strings.
+    """
+    usage_map = {row["date"]: float(row["usage"]) for row in usage_data}
+    weather_map = {row["date"]: float(row["mean"]) for row in weather_data}
+
+    shared_dates = sorted(set(usage_map.keys()) & set(weather_map.keys()))
+    if exclude_start or exclude_end:
+        start_date = (
+            datetime.strptime(exclude_start, "%Y-%m-%d").date()
+            if exclude_start
+            else None
+        )
+        end_date = (
+            datetime.strptime(exclude_end, "%Y-%m-%d").date()
+            if exclude_end
+            else None
+        )
+
+        def _in_excluded_range(date_str: str) -> bool:
+            d = datetime.strptime(date_str, "%Y-%m-%d").date()
+            if start_date and d < start_date:
+                return False
+            if end_date and d > end_date:
+                return False
+            return True
+
+        shared_dates = [d for d in shared_dates if not _in_excluded_range(d)]
+    if not shared_dates:
+        raise ValueError("No overlapping dates between usage and weather data.")
+
+    temps = [weather_map[d] for d in shared_dates]
+    usage_vals = [usage_map[d] for d in shared_dates]
+
+    plt.figure(figsize=(7, 5))
+    plt.scatter(temps, usage_vals, color="tab:purple", alpha=0.7)
+    plt.xlabel("Temperature (°F)")
+    plt.ylabel("Electric use (kWh)")
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     data = load_daily_usage("local/electric.csv")
     weather = load_weather_mean("local/weather-data - Sheet1.csv")
     plot_usage_vs_temperature(data, weather)
+    plot_usage_by_temperature(data, weather)

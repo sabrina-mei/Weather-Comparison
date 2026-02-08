@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def load_daily_usage(csv_path: str | Path) -> List[Dict[str, str | float]]:
@@ -117,12 +118,14 @@ def plot_usage_by_temperature(
     weather_data: List[Dict[str, str | float]],
     exclude_start: str | None = "2025-12-22",
     exclude_end: str | None = "2026-01-19",
+    fit_degree: int = 2,
 ) -> None:
     """
     Plot daily electric usage vs mean temperature.
     X-axis: temperature (°F)
     Y-axis: electric use (kWh)
     Optionally exclude a date range (inclusive) using YYYY-MM-DD strings.
+    Fits a polynomial curve of degree `fit_degree`.
     """
     usage_map = {row["date"]: float(row["usage"]) for row in usage_data}
     weather_map = {row["date"]: float(row["mean"]) for row in weather_data}
@@ -156,9 +159,19 @@ def plot_usage_by_temperature(
     usage_vals = [usage_map[d] for d in shared_dates]
 
     plt.figure(figsize=(7, 5))
-    plt.scatter(temps, usage_vals, color="tab:purple", alpha=0.7)
+    plt.scatter(temps, usage_vals, color="tab:purple", alpha=0.7, label="Data")
+
+    if fit_degree >= 1 and len(temps) > fit_degree:
+        x = np.array(temps, dtype=float)
+        y = np.array(usage_vals, dtype=float)
+        coeffs = np.polyfit(x, y, deg=fit_degree)
+        poly = np.poly1d(coeffs)
+        x_fit = np.linspace(x.min(), x.max(), 200)
+        y_fit = poly(x_fit)
+        plt.plot(x_fit, y_fit, color="tab:orange", linewidth=2, label="Curve fit")
     plt.xlabel("Temperature (°F)")
     plt.ylabel("Electric use (kWh)")
+    plt.legend()
     plt.tight_layout()
     plt.show()
 

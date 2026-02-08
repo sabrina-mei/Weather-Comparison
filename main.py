@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 
+import matplotlib.pyplot as plt
+
 
 def load_daily_usage(csv_path: str | Path) -> List[Dict[str, str | float]]:
     """
@@ -43,6 +45,74 @@ def load_daily_usage(csv_path: str | Path) -> List[Dict[str, str | float]]:
     return [{"date": d, "usage": totals[d]} for d in sorted(totals.keys())]
 
 
+def load_weather_mean(csv_path: str | Path) -> List[Dict[str, str | float]]:
+    """
+    Read the weather CSV and return a list of daily mean temperatures.
+
+    Output format:
+        [{"date": "YYYY-MM-DD", "mean": <float_f>}, ...]
+    """
+    csv_path = Path(csv_path)
+
+    with csv_path.open("r", newline="", encoding="utf-8") as f:
+        # Skip any pre-header rows until we reach the header line
+        for line in f:
+            if line.strip().startswith("Date,"):
+                header = line
+                break
+        else:
+            raise ValueError("Weather header not found in CSV.")
+
+        reader = csv.DictReader(f, fieldnames=next(csv.reader([header])))
+
+        rows: List[Dict[str, str | float]] = []
+        for row in reader:
+            date_str = row.get("Date")
+            mean = row.get("Mean")
+            if not date_str or not mean:
+                continue
+
+            date_obj = datetime.strptime(date_str.strip(), "%m/%d/%Y").date()
+            rows.append({"date": date_obj.isoformat(), "mean": float(mean)})
+
+    return rows
+
+
+def plot_usage_vs_temperature(
+    usage_data: List[Dict[str, str | float]],
+    weather_data: List[Dict[str, str | float]],
+) -> None:
+    """
+    Plot electric usage (left axis, kWh) and mean temperature (right axis, °F)
+    over time. Uses dates present in both datasets.
+    """
+    usage_map = {row["date"]: float(row["usage"]) for row in usage_data}
+    weather_map = {row["date"]: float(row["mean"]) for row in weather_data}
+
+    shared_dates = sorted(set(usage_map.keys()) & set(weather_map.keys()))
+    if not shared_dates:
+        raise ValueError("No overlapping dates between usage and weather data.")
+
+    x_dates = [datetime.strptime(d, "%Y-%m-%d").date() for d in shared_dates]
+    usage_vals = [usage_map[d] for d in shared_dates]
+    temp_vals = [weather_map[d] for d in shared_dates]
+
+    fig, ax_left = plt.subplots(figsize=(10, 5))
+    ax_left.plot(x_dates, usage_vals, color="tab:blue", label="Electric usage")
+    ax_left.set_xlabel("Date")
+    ax_left.set_ylabel("Electric use (kWh)", color="tab:blue")
+    ax_left.tick_params(axis="y", labelcolor="tab:blue")
+
+    ax_right = ax_left.twinx()
+    ax_right.plot(x_dates, temp_vals, color="tab:red", label="Mean temperature")
+    ax_right.set_ylabel("Temperature (°F)", color="tab:red")
+    ax_right.tick_params(axis="y", labelcolor="tab:red")
+
+    fig.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     data = load_daily_usage("local/electric.csv")
-    print(data[:5])
+    weather = load_weather_mean("local/weather-data - Sheet1.csv")
+    plot_usage_vs_temperature(data, weather)
